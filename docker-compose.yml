@@ -1,33 +1,26 @@
 
-version: '3.2'
+
+version: '3.1'
 
 networks:
   dev_network:
 
 services:
-
   db:
-    image: postgres
-    restart: always
-    environment:
-      POSTGRES_PASSWORD: 1234
-      POSTGRES_USER: admin
-      POSTGRES_DB: flask_netology
-      POSTGRES_HOST_AUTH_METHOD: trust
-
+    build: db
     ports:
-    - 5432:5432
-
+      - "5432:5432"
+    container_name: users_api_db_main
     networks:
       dev_network:
         aliases:
-          - db
+          - db-main
 
   app:
     build:
       context: .
       args:
-        PG_DSN: 'postgresql://admin:1234@db:5432/flask_netology'
+        PG_DSN: 'postgresql://admin:1234@db-main:5432/flask_netology'
     ports:
       - "5000:5000"
     container_name: app
@@ -37,6 +30,8 @@ services:
       dev_network:
         aliases:
           - flask_api
+    restart:
+      always
     volumes:
       - ./:/app
 
