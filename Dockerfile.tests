@@ -1,0 +1,15 @@
+FROM python:3.9
+
+COPY . /app
+WORKDIR /app
+
+RUN pip install --no-cache-dir -r requirements-dev.txt
+RUN pip install --no-cache-dir -r requirements.txt
+
+ARG API_URL
+ARG PG_DSN
+
+ENV API_URL=$API_URL
+ENV PG_DSN=$PG_DSN
+
+ENTRYPOINT pytest -v -s --disable-warnings

@@ -6,26 +6,6 @@ networks:
   dev_network:
 
 services:
-  app:
-    build:
-      context: .
-      args:
-        PG_DSN: 'postgresql://admin:1234@db-main:5432/flask_netology'
-    ports:
-      - "5000:5000"
-    container_name: app
-    depends_on:
-      db:
-        condition: service_healthy
-    networks:
-      dev_network:
-        aliases:
-          - flask_api
-    restart:
-      always
-    volumes:
-      - ./:/app
-
 
   db:
     build: db
@@ -36,8 +16,40 @@ services:
       dev_network:
         aliases:
           - db-main
-    healthcheck:
-      test: [ "CMD-SHELL", "pg_isready" ]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+
+  app:
+    build:
+      context: .
+      args:
+        PG_DSN: 'postgresql://admin:1234@db-main:5432/flask_netology'
+    ports:
+      - "5000:5000"
+    container_name: app
+    depends_on:
+      - db
+    networks:
+      dev_network:
+        aliases:
+          - flask_api
+    restart:
+      always
+    volumes:
+      - ./:/app
+
+  tests:
+    build:
+      context: .
+      dockerfile: Dockerfile.tests
+      args:
+        API_URL: http://flask_api:5000
+        PG_DSN: 'postgresql://admin:1234@db-main:5432/flask_netology'
+    depends_on:
+      - db
+      - app
+
+    networks:
+      dev_network:
+        aliases:
+          - test_client
+    volumes:
+      - ./:/app

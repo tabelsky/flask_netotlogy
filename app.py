@@ -1,35 +1,43 @@
 import atexit
 import os
-import uuid
-import pydantic
 import re
+import uuid
 from typing import Union
-from flask import Flask, request, jsonify
+
+import pydantic
+from flask import Flask, jsonify, request
 from flask.views import MethodView
 from flask_bcrypt import Bcrypt
-from sqlalchemy import create_engine, Integer, String, Column, DateTime, ForeignKey
-from sqlalchemy import func
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker, relationship
+from sqlalchemy import (
+    Column,
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+    create_engine,
+    func,
+)
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import relationship, sessionmaker
 
-app = Flask('app')
+app = Flask("app")
 bcrypt = Bcrypt(app)
-engine = create_engine(os.getenv('PG_DSN'))
+engine = create_engine(os.getenv("PG_DSN"))
 Base = declarative_base()
 Session = sessionmaker(bind=engine)
 
 
 atexit.register(lambda: engine.dispose())
 
-PASSWORD_LENGTH = 8
 password_regex = re.compile(
     "^(?=.*[a-z_])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*#?&_])[A-Za-z\d@$!#%*?&_]{8,200}$"
 )
 
+
 class User(Base):
-    __tablename__ = 'users'
+    __tablename__ = "users"
     id = Column(Integer, primary_key=True)
     user_name = Column(String(100), nullable=False, unique=True)
     password = Column(String(200), nullable=False)
@@ -37,7 +45,10 @@ class User(Base):
 
     @classmethod
     def register(cls, session: Session, user_name: str, password: str):
-        new_user = User(user_name=user_name, password=bcrypt.generate_password_hash(password.encode()).decode())
+        new_user = User(
+            user_name=user_name,
+            password=bcrypt.generate_password_hash(password.encode()).decode(),
+        )
         session.add(new_user)
         try:
             session.commit()
@@ -50,18 +61,19 @@ class User(Base):
 
     def to_dict(self):
         return {
-            'user_name': self.user_name,
-            'registration_time': int(self.registration_time.timestamp())
+            "user_name": self.user_name,
+            "registration_time": int(self.registration_time.timestamp()),
+            "id": self.id,
         }
 
 
 class Token(Base):
-    __tablename__ = 'tokens'
+    __tablename__ = "tokens"
 
     id = Column(UUID(as_uuid=True), default=uuid.uuid4, primary_key=True)
     creation_time = Column(DateTime, server_default=func.now())
-    user_id = Column(Integer, ForeignKey('users.id'))
-    user = relationship(User, lazy='joined')
+    user_id = Column(Integer, ForeignKey("users.id"))
+    user = relationship(User, lazy="joined")
 
 
 Base.metadata.create_all(engine)
@@ -81,12 +93,17 @@ def handle_invalid_usage(error):
 
 
 def check_token(session):
-    token = session.query(Token).join(User).filter(
-        User.user_name == request.headers.get('user_name'),
-        Token.id == request.headers.get('token')
-    ).first()
+    token = (
+        session.query(Token)
+        .join(User)
+        .filter(
+            User.user_name == request.headers.get("user_name"),
+            Token.id == request.headers.get("token"),
+        )
+        .first()
+    )
     if token is None:
-        raise HTTPError(401, 'invalid token')
+        raise HTTPError(401, "invalid token")
     return token
 
 
@@ -110,12 +127,11 @@ def validate(unvalidated_data: dict, validation_model):
 
 
 class UserView(MethodView):
-
     def get(self, user_id: int):
         with Session() as session:
             token = check_token(session)
             if token.user.id != user_id:
-                raise HTTPError(403, 'auth error')
+                raise HTTPError(403, "auth error")
             return jsonify(token.user.to_dict())
 
     def post(self):
@@ -124,27 +140,26 @@ class UserView(MethodView):
             return User.register(session, **register_data).to_dict()
 
 
-@app.route('/login', methods=['POST'])
+@app.route("/login/", methods=["POST"])
 def login():
     login_data = request.json
     with Session() as session:
-        user = session.query(User).filter(User.user_name == login_data['user_name']).first()
-        if user is None or not user.check_password(login_data['password']):
-            raise HTTPError(401, 'incorrect user or password')
+        user = (
+            session.query(User)
+            .filter(User.user_name == login_data["user_name"])
+            .first()
+        )
+        if user is None or not user.check_password(login_data["password"]):
+            raise HTTPError(401, "incorrect user or password")
         token = Token(user_id=user.id)
         session.add(token)
         session.commit()
-        return jsonify({'token': token.id})
+        return jsonify({"token": token.id})
 
 
-@app.route('/token/<token_id>', methods=['GET'])
-def token(token_id):
-    with Session() as session:
-        token = session.query(Token).get(token_id)
-        return jsonify({
-            'token': token.user_id
-        })
-
-
-app.add_url_rule('/user/<int:user_id>', view_func=UserView.as_view('get_user'), methods=['GET'])
-app.add_url_rule('/user/', view_func=UserView.as_view('register_user'), methods=['POST'])
+app.add_url_rule(
+    "/user/<int:user_id>/", view_func=UserView.as_view("get_user"), methods=["GET"]
+)
+app.add_url_rule(
+    "/user/", view_func=UserView.as_view("register_user"), methods=["POST"]
+)
