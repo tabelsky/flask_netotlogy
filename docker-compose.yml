@@ -1,21 +1,11 @@
 
 
-version: '3.1'
+version: '3.9'
 
 networks:
   dev_network:
 
 services:
-  db:
-    build: db
-    ports:
-      - "5432:5432"
-    container_name: users_api_db_main
-    networks:
-      dev_network:
-        aliases:
-          - db-main
-
   app:
     build:
       context: .
@@ -25,7 +15,8 @@ services:
       - "5000:5000"
     container_name: app
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     networks:
       dev_network:
         aliases:
@@ -36,3 +27,17 @@ services:
       - ./:/app
 
 
+  db:
+    build: db
+    ports:
+      - "5432:5432"
+    container_name: users_api_db_main
+    networks:
+      dev_network:
+        aliases:
+          - db-main
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
