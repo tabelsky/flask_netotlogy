@@ -1,2 +1,2 @@
-isort .
-black .
+isort app
+black app

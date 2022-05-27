@@ -8,10 +8,14 @@ networks:
 services:
 
   db:
-    build: db
+    image: postgres:14.3-alpine3.15
     ports:
       - "5432:5432"
-    container_name: users_api_db_main
+    environment:
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: 1234
+      POSTGRES_DB: netology
+
     networks:
       dev_network:
         aliases:
@@ -20,11 +24,10 @@ services:
   app:
     build:
       context: .
-      args:
-        PG_DSN: 'postgresql://admin:1234@db-main:5432/flask_netology'
+    environment:
+      PG_DSN: postgresql://app:1234@db-main:5432/netology
     ports:
       - "5000:5000"
-    container_name: app
     depends_on:
       - db
     networks:
@@ -34,15 +37,15 @@ services:
     restart:
       always
     volumes:
-      - ./:/app
+      - ./app:/app
 
   tests:
     build:
       context: .
       dockerfile: Dockerfile.tests
-      args:
-        API_URL: http://flask_api:5000
-        PG_DSN: 'postgresql://admin:1234@db-main:5432/flask_netology'
+    environment:
+      API_URL: http://flask_api:5000
+      PG_DSN: postgresql://app:1234@db-main:5432/netology
     depends_on:
       - db
       - app
@@ -52,4 +55,4 @@ services:
         aliases:
           - test_client
     volumes:
-      - ./:/app
+      - ./app/:/app
