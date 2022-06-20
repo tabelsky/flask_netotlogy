@@ -51,6 +51,8 @@ services:
     depends_on:
       - db
       - app
+    working_dir: /app
+    entrypoint: pytest -v -s --disable-warnings
 
     networks:
       dev_network:
