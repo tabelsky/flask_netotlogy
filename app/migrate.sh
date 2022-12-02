@@ -1,2 +1,2 @@
-alembic revision --autogenerate -m "Added required tables"
+alembic revision --autogenerate -m 'new migration'
 alembic upgrade head

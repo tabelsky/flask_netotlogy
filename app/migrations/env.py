@@ -1,15 +1,19 @@
-import os
 from logging.config import fileConfig
 
+import config as app_config
 from alembic import context
+from models import Base
 from sqlalchemy import engine_from_config, pool
-
-from app import Base
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config
-config.set_section_option(config.config_ini_section, "PG_DSN", os.getenv("PG_DSN"))
+config.set_section_option(config.config_ini_section, "PG_HOST", app_config.PG_HOST)
+config.set_section_option(config.config_ini_section, "PG_PORT", str(app_config.PG_PORT))
+config.set_section_option(config.config_ini_section, "PG_USER", app_config.PG_USER)
+config.set_section_option(config.config_ini_section, "PG_PASSWORD", app_config.PG_PASSWORD)
+config.set_section_option(config.config_ini_section, "PG_DB", app_config.PG_DB)
+
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
@@ -28,7 +32,7 @@ target_metadata = Base.metadata
 # ... etc.
 
 
-def run_migrations_offline():
+def run_migrations_offline() -> None:
     """Run migrations in 'offline' mode.
 
     This configures the context with just a URL
@@ -52,7 +56,7 @@ def run_migrations_offline():
         context.run_migrations()
 
 
-def run_migrations_online():
+def run_migrations_online() -> None:
     """Run migrations in 'online' mode.
 
     In this scenario we need to create an Engine

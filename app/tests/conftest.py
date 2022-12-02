@@ -1,34 +1,60 @@
+import datetime
+import secrets
+import time
+
 import pytest
+from auth import hash_password
+from models import Base, Token, User, get_engine, get_session_maker
+from tests.config import ROOT_USER_EMAIL, ROOT_USER_PASSWORD
 
-import app
-from tests.api_client import get_client
 
-ADMIN_USERNAME = "admin"
-ADMIN_PASSWORD = "StrongPassword_!#123"
+def get_random_password():
+    password = secrets.token_hex()
+    return f"{password[:10]}{password[10:20].upper()}"
 
 
 @pytest.fixture(scope="session", autouse=True)
-def clean_up_database():
-    print("v" * 100)
-    app.Base.metadata.drop_all(app.engine)
-    app.Base.metadata.create_all(app.engine)
+def init_database():
+    engine = get_engine()
+    Base.metadata.drop_all(bind=engine)
+    Base.metadata.create_all(bind=engine)
     yield
-    app.Base.metadata.drop_all(app.engine)
-    app.Base.metadata.create_all(app.engine)
+    engine.dispose()
 
 
-@pytest.fixture(scope="session", autouse=True)
-def api_client():
-    return get_client()
+def create_user(email: str = None, password: str = None):
+    email = email or f"user{time.time()}@email.te"
+    password = password or get_random_password()
+    Session = get_session_maker()
+    with Session() as session:
+        new_user = User(email=email, password=hash_password(password))
+        session.add(new_user)
+        session.commit()
+        return {
+            "id": new_user.id,
+            "email": new_user.email,
+            "password": password,
+            "registration_time": new_user.registration_time,
+        }
 
 
-@pytest.fixture(scope="session", autouse=True)
-def admin_user(clean_up_database, api_client):
-    user = api_client.register(ADMIN_USERNAME, ADMIN_PASSWORD)
-    return {"user_name": ADMIN_USERNAME, "password": ADMIN_PASSWORD, "id": user["id"]}
+@pytest.fixture(scope="session")
+def root_user():
+    return create_user(ROOT_USER_EMAIL, ROOT_USER_PASSWORD)
 
 
 @pytest.fixture()
-def admin_login(api_client, admin_user):
-    api_client.login(admin_user["user_name"], admin_user["password"])
-    return api_client
+def new_user():
+    return create_user()
+
+
+@pytest.fixture()
+def expired_token():
+    Session = get_session_maker()
+
+    with Session() as session:
+        user = create_user()
+        token = Token(user_id=user["id"], creation_time=datetime.datetime.utcnow() - datetime.timedelta(days=1000))
+        session.add(token)
+        session.commit()
+        return str(token.id)
